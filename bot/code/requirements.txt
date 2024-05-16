@@ -1,0 +1,4 @@
+aiohttp==3.8.5
+botbuilder-core==4.14.8
+botbuilder-azure==4.14.8
+botbuilder-integration-aiohttp==4.14.8

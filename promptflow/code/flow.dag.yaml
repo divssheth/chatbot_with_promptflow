@@ -1,0 +1,89 @@
+id: chat_with_wikipedia
+name: Chat with Wikipedia
+environment:
+  python_requirements_txt: requirements.txt
+inputs:
+  chat_history:
+    type: list
+    default:
+    - inputs:
+        question: You are a general purpose AI tool. tell me a joke
+      outputs:
+        answer: I'm sorry but I cannot answer this question. Is there anything else I
+          can help you with?
+    is_chat_input: false
+    is_chat_history: true
+  question:
+    type: string
+    default: You are a general purpose AI tool. tell me a joke
+    is_chat_input: true
+  organization:
+    type: string
+    is_chat_input: false
+  organization_urls:
+    type: list
+    is_chat_input: false
+  categories:
+    type: string
+    is_chat_input: false
+outputs:
+  answer:
+    type: string
+    reference: ${augmented_chat.output}
+    is_chat_output: true
+nodes:
+- name: extract_query_from_question
+  type: llm
+  source:
+    type: code
+    path: extract_query_from_question.jinja2
+  inputs:
+    deployment_name: gpt4-turbo
+    temperature: 0.2
+    top_p: 1
+    max_tokens: 256
+    response_format:
+      type: json_object
+    presence_penalty: 0
+    frequency_penalty: 0
+    chat_history: ${inputs.chat_history}
+    conversation_categories: ${inputs.categories}
+    organization: ${inputs.organization}
+    question: ${inputs.question}
+  provider: AzureOpenAI
+  connection: gpt4conn
+  api: chat
+  module: promptflow.tools.aoai
+  use_variants: false
+- name: search_bing
+  type: python
+  source:
+    type: code
+    path: append_site_to_search_query.py
+  inputs:
+    conn: BING_SEARCH
+    organization_urls: ${inputs.organization_urls}
+    question: ${extract_query_from_question.output}
+  use_variants: false
+- name: augmented_chat
+  type: llm
+  source:
+    type: code
+    path: augmented_chat.jinja2
+  inputs:
+    deployment_name: gpt4-turbo
+    temperature: 0.2
+    top_p: 1
+    max_tokens: 500
+    presence_penalty: 0
+    frequency_penalty: 0
+    chat_history: ${inputs.chat_history}
+    context: ${search_bing.output}
+    conversation_categories: ${inputs.categories}
+    organization: ${inputs.organization}
+    question: ${inputs.question}
+  provider: AzureOpenAI
+  connection: gpt4conn
+  api: chat
+  module: promptflow.tools.aoai
+  use_variants: false

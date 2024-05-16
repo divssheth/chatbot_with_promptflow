@@ -1,0 +1,339 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "groupName": {
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the name of the Resource Group."
+        }
+      },
+      "groupLocation": {
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the location of the Resource Group."
+        }
+      },
+      "appServiceName": {
+        "type": "string",
+        "metadata": {
+          "description": "The globally unique name of the Web App."
+        }
+      },
+      "appServicePlanName": {
+        "type": "string",
+        "metadata": {
+          "description": "The name of the App Service Plan."
+        }
+      },
+      "appServicePlanLocation": {
+        "type": "string",
+        "defaultValue": "",
+        "metadata": {
+          "description": "The location of the App Service Plan."
+        }
+      },
+      "appServicePlanSku": {
+        "type": "object",
+        "defaultValue": {
+          "name": "S1",
+          "tier": "Standard",
+          "size": "S1",
+          "family": "S",
+          "capacity": 1
+        },
+        "metadata": {
+          "description": "The SKU of the App Service Plan. Defaults to Standard values."
+        }
+      },
+      "appId": {
+        "type": "string",
+        "metadata": {
+          "description": "Active Directory App ID or User-Assigned Managed Identity Client ID, set as MicrosoftAppId in the Web App's Application Settings."
+        }
+      },
+      "appSecret": {
+        "type": "string",
+        "metadata": {
+          "description": "Active Directory App Password, set as MicrosoftAppPassword in the Web App's Application Settings. Required for MultiTenant and SingleTenant app types."
+        }
+      },
+      "ADD_COSMOS_MEMORY": {
+        "type": "string",
+        "metadata": {
+          "description": "TRUE/FALSE, if true, Cosmos DB details will be needed for saving conversations. Default is FALSE."
+        }
+      },
+      "COSMOS_DB_URI": {
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the Cosmos DB URI."
+        }
+      },
+      "COSMOS_DB_PRIMARY_KEY": {
+        "type": "string",
+        "metadata": {
+          "description": "Cosmos DB Primary Key."
+        }
+      },
+      "COSMOS_DB_DATABASE_ID": {
+        "type": "string",
+        "metadata": {
+          "description": "Database ID in Cosmos DB."
+        }
+      },
+      "COSMOS_DB_CONTAINER_ID": {
+        "type": "string",
+        "metadata": {
+          "description": "Container ID in Cosmos DB."
+        }
+      },
+      "LLM_APP_ENDPOINT": {
+        "type": "string",
+        "defaultValue": "",
+        "metadata": {
+          "description": "The managed online endpoint address for the LLM app."
+        }
+      },
+      "LLM_API_KEY": {
+        "type": "string",
+        "defaultValue": "",
+        "metadata": {
+          "description": "Key to access the LLM endpoint"
+        }
+      },
+      "CATEGORIES": {
+        "type": "string",
+        "metadata": {
+          "description": "Categories you would like the bot to support. Comma separated values. Example: 'General,HR,IT,Finance'"
+        }
+      },
+      "ORGANIZATION_URLS": {
+        "type": "string",
+        "metadata": {
+          "description": "Comma separated URLs of the organizations bot would have access to generate answers. Example: ['https://org1.com','https://org2.com']"
+        }
+      },
+      "ORGANIZATION": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the organization."
+        }
+      },
+      "WELCOME_MESSAGE": {
+        "type": "string",
+        "metadata": {
+          "description": "Welcome message to be shown when the BOT starts."
+        }
+      }
+    },
+    "variables": {
+      "appServicePlanName": "[parameters('appServicePlanName')]",
+      "resourcesLocation": "[if(empty(parameters('appServicePlanLocation')), parameters('groupLocation'), parameters('appServicePlanLocation'))]",
+      "appServiceName": "[parameters('appServiceName')]",
+      "resourceGroupId": "[concat(subscription().id, '/resourceGroups/', parameters('groupName'))]"
+    },
+    "resources": [
+      {
+        "name": "[parameters('groupName')]",
+        "type": "Microsoft.Resources/resourceGroups",
+        "apiVersion": "2018-05-01",
+        "location": "[parameters('groupLocation')]",
+        "properties": {}
+      },
+      {
+        "type": "Microsoft.Resources/deployments",
+        "apiVersion": "2018-05-01",
+        "name": "storageDeployment",
+        "resourceGroup": "[parameters('groupName')]",
+        "dependsOn": [
+          "[resourceId('Microsoft.Resources/resourceGroups/', parameters('groupName'))]"
+        ],
+        "properties": {
+          "mode": "Incremental",
+          "template": {
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {},
+            "variables": {},
+            "resources": [
+              {
+                "comments": "Create a new App Service Plan",
+                "type": "Microsoft.Web/serverfarms",
+                "name": "[variables('appServicePlanName')]",
+                "apiVersion": "2018-02-01",
+                "location": "[variables('resourcesLocation')]",
+                "sku": "[parameters('appServicePlanSku')]",
+                "kind": "linux",
+                "properties": {
+                  "name": "[variables('appServicePlanName')]",
+                  "perSiteScaling": false,
+                  "reserved": true,
+                  "targetWorkerCount": 0,
+                  "targetWorkerSizeId": 0
+                }
+              },
+              {
+                "comments": "Create a Web App using the new App Service Plan",
+                "type": "Microsoft.Web/sites",
+                "apiVersion": "2015-08-01",
+                "location": "[variables('resourcesLocation')]",
+                "kind": "app,linux",
+                "dependsOn": [
+                  "[concat(variables('resourceGroupId'), '/providers/Microsoft.Web/serverfarms/', variables('appServicePlanName'))]"
+                ],
+                "name": "[variables('appServiceName')]",
+                "properties": {
+                  "name": "[variables('appServiceName')]",
+                  "hostNameSslStates": [
+                    {
+                      "name": "[concat(parameters('appServiceName'), '.azurewebsites.net')]",
+                      "sslState": "Disabled",
+                      "hostType": "Standard"
+                    },
+                    {
+                      "name": "[concat(parameters('appServiceName'), '.scm.azurewebsites.net')]",
+                      "sslState": "Disabled",
+                      "hostType": "Repository"
+                    }
+                  ],
+                  "serverFarmId": "[variables('appServicePlanName')]",
+                  "siteConfig": {
+                    "appSettings": [
+                      {
+                        "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                        "value": "true"
+                      },
+                      {
+                        "name": "MicrosoftAppId",
+                        "value": "[parameters('appId')]"
+                      },
+                      {
+                        "name": "MicrosoftAppPassword",
+                        "value": "[parameters('appSecret')]"
+                      },
+                      {
+                        "name": "COSMOS_DB_URI",
+                        "value": "[parameters('COSMOS_DB_URI')]"
+                      },
+                      {
+                        "name": "COSMOS_DB_PRIMARY_KEY",
+                        "value": "[parameters('COSMOS_DB_PRIMARY_KEY')]"
+                      },
+                      {
+                        "name": "COSMOS_DB_DATABASE_ID",
+                        "value": "[parameters('COSMOS_DB_DATABASE_ID')]"
+                      },
+                      {
+                        "name": "COSMOS_DB_CONTAINER_ID",
+                        "value": "[parameters('COSMOS_DB_CONTAINER_ID')]"
+                      },
+                      {
+                        "name": "LLM_APP_ENDPOINT",
+                        "value": "[parameters('LLM_APP_ENDPOINT')]"
+                      },
+                      {
+                        "name": "LLM_API_KEY",
+                        "value": "[parameters('LLM_API_KEY')]"
+                      },
+                      {
+                        "name": "CATEGORIES",
+                        "value": "[parameters('CATEGORIES')]"
+                      },
+                      {
+                        "name": "ORGANIZATION_URLS",
+                        "value": "[parameters('ORGANIZATION_URLS')]"
+                      },
+                      {
+                        "name": "ORGANIZATION",
+                        "value": "[parameters('ORGANIZATION')]"
+                      },
+                      {
+                        "name": "ADD_COSMOS_MEMORY",
+                        "value": "[parameters('ADD_COSMOS_MEMORY')]"
+                      },
+                      {
+                        "name": "WELCOME_MESSAGE",
+                        "value": "[parameters('WELCOME_MESSAGE')]"
+                      }
+                    ],
+                    "cors": {
+                      "allowedOrigins": [
+                        "https://botservice.hosting.portal.azure.net",
+                        "https://hosting.onecloud.azure-test.net/"
+                      ]
+                    },
+                    "webSocketsEnabled": true
+                  }
+                }
+              },
+              {
+                "type": "Microsoft.Web/sites/config",
+                "apiVersion": "2016-08-01",
+                "name": "[concat(parameters('appServiceName'), '/web')]",
+                "location": "[variables('resourcesLocation')]",
+                "dependsOn": [
+                  "[concat(variables('resourceGroupId'), '/providers/Microsoft.Web/sites/', parameters('appServiceName'))]"
+                ],
+                "properties": {
+                  "numberOfWorkers": 1,
+                  "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php",
+                    "hostingstart.html"
+                  ],
+                  "netFrameworkVersion": "v4.0",
+                  "phpVersion": "",
+                  "pythonVersion": "",
+                  "nodeVersion": "",
+                  "linuxFxVersion": "PYTHON|3.10",
+                  "requestTracingEnabled": false,
+                  "remoteDebuggingEnabled": false,
+                  "remoteDebuggingVersion": "VS2017",
+                  "httpLoggingEnabled": true,
+                  "logsDirectorySizeLimit": 35,
+                  "detailedErrorLoggingEnabled": false,
+                  "publishingUsername": "[concat('$', parameters('appServiceName'))]",
+                  "scmType": "None",
+                  "use32BitWorkerProcess": true,
+                  "webSocketsEnabled": false,
+                  "alwaysOn": false,
+                  "appCommandLine": "gunicorn --bind 0.0.0.0 --worker-class aiohttp.worker.GunicornWebWorker --timeout 600 app:APP",
+                  "managedPipelineMode": "Integrated",
+                  "virtualApplications": [
+                    {
+                      "virtualPath": "/",
+                      "physicalPath": "site\\wwwroot",
+                      "preloadEnabled": false,
+                      "virtualDirectories": null
+                    }
+                  ],
+                  "winAuthAdminState": 0,
+                  "winAuthTenantState": 0,
+                  "customAppPoolIdentityAdminState": false,
+                  "customAppPoolIdentityTenantState": false,
+                  "loadBalancing": "LeastRequests",
+                  "routingRules": [],
+                  "experiments": {
+                    "rampUpRules": []
+                  },
+                  "autoHealEnabled": false,
+                  "vnetName": "",
+                  "minTlsVersion": "1.2",
+                  "ftpsState": "AllAllowed",
+                  "reservedInstanceCount": 0
+                }
+              }
+            ],
+            "outputs": {}
+          }
+        }
+      }
+    ]
+  }

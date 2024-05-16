@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "groupName": {
+            "value": ""
+        },
+        "groupLocation": {
+            "value": ""
+        },
+        "appServiceName": {
+            "value": ""
+        },
+        "appServicePlanName": {
+            "value": ""
+        },
+        "appServicePlanLocation": {
+            "value": ""
+        },
+        "appServicePlanSku": {
+            "value": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            }
+        },
+        "COSMOS_DB_URI": {
+            "value": ""
+        },
+        "COSMOS_DB_PRIMARY_KEY": {
+            "value": ""
+        },
+        "COSMOS_DB_DATABASE_ID": {
+            "value": ""
+        },
+        "COSMOS_DB_CONTAINER_ID": {
+            "value": ""
+        },
+        "LLM_APP_ENDPOINT": {
+            "value": ""
+        },
+        "LLM_API_KEY": {
+            "value": ""
+        },
+        "CATEGORIES": {
+            "value": ""
+        },
+        "ORGANIZATION_URLS": {
+            "value": ""
+        },
+        "ORGANIZATION": {
+            "value": ""
+        },
+        "ADD_COSMOS_MEMORY": {
+            "value": ""
+        },
+        "WELCOME_MESSAGE": {
+            "value": "Welcome to Chatty!"
+        }
+    }
+}
